@@ -1,0 +1,7 @@
+[package]
+name = "ssdgraph"
+version = "0.1.0"
+edition = "2021"
+description = "A property graph database that lives on SSD, with a tiny in-memory lookup cache."
+
+[dependencies]
