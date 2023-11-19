@@ -5,3 +5,6 @@ edition = "2021"
 description = "A property graph database that lives on SSD, with a tiny in-memory lookup cache."
 
 [dependencies]
+
+[dev-dependencies]
+tempfile = "3"
