@@ -10,8 +10,10 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use super::page::{Page, PageId, PageKind, PAGE_SIZE};
+use crate::cache::{PageCache, DEFAULT_CAPACITY};
 
 const MAGIC: &[u8; 8] = b"SSDGRAPH";
 const VERSION: u32 = 1;
@@ -21,10 +23,15 @@ pub struct Pager {
     file: File,
     next_page_id: PageId,
     free_head: PageId,
+    cache: PageCache,
 }
 
 impl Pager {
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        Self::open_with_cache(path, DEFAULT_CAPACITY)
+    }
+
+    pub fn open_with_cache<P: AsRef<Path>>(path: P, cache_pages: usize) -> io::Result<Self> {
         let path = path.as_ref();
         let exists = path.exists() && std::fs::metadata(path)?.len() >= PAGE_SIZE as u64;
         let file = OpenOptions::new()
@@ -33,13 +40,13 @@ impl Pager {
             .create(true)
             .open(path)?;
         if exists {
-            Self::load_header(file)
+            Self::load_header(file, cache_pages)
         } else {
-            Self::init_new(file)
+            Self::init_new(file, cache_pages)
         }
     }
 
-    fn init_new(mut file: File) -> io::Result<Self> {
+    fn init_new(mut file: File, cache_pages: usize) -> io::Result<Self> {
         let mut header = [0u8; PAGE_SIZE];
         header[0..8].copy_from_slice(MAGIC);
         header[8..12].copy_from_slice(&VERSION.to_le_bytes());
@@ -52,10 +59,11 @@ impl Pager {
             file,
             next_page_id: 1,
             free_head: 0,
+            cache: PageCache::new(cache_pages),
         })
     }
 
-    fn load_header(mut file: File) -> io::Result<Self> {
+    fn load_header(mut file: File, cache_pages: usize) -> io::Result<Self> {
         let mut header = [0u8; PAGE_SIZE];
         file.seek(SeekFrom::Start(0))?;
         file.read_exact(&mut header)?;
@@ -75,6 +83,7 @@ impl Pager {
             file,
             next_page_id,
             free_head,
+            cache: PageCache::new(cache_pages),
         })
     }
 
@@ -99,6 +108,7 @@ impl Pager {
                 .map(u64::from_le_bytes)
                 .unwrap_or(0);
             self.free_head = next;
+            self.cache.invalidate(head);
             head
         } else {
             let id = self.next_page_id;
@@ -111,11 +121,17 @@ impl Pager {
         Ok(page)
     }
 
-    pub fn read_page(&mut self, id: PageId) -> io::Result<Page> {
+    pub fn read_page(&mut self, id: PageId) -> io::Result<Arc<Page>> {
         if id == HEADER_PAGE {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "page 0 is header"));
         }
-        self.read_page_raw(id)
+        if let Some(p) = self.cache.get(id) {
+            return Ok(p);
+        }
+        let page = self.read_page_raw(id)?;
+        let arc = Arc::new(page);
+        self.cache.put(id, Arc::clone(&arc));
+        Ok(arc)
     }
 
     fn read_page_raw(&mut self, id: PageId) -> io::Result<Page> {
@@ -134,6 +150,7 @@ impl Pager {
         }
         self.file.seek(SeekFrom::Start(page.id * PAGE_SIZE as u64))?;
         self.file.write_all(page.as_bytes())?;
+        self.cache.invalidate(page.id);
         Ok(())
     }
 
@@ -154,6 +171,10 @@ impl Pager {
 
     pub fn next_page_id(&self) -> PageId {
         self.next_page_id
+    }
+
+    pub fn cache_stats(&self) -> (u64, u64) {
+        (self.cache.hits(), self.cache.misses())
     }
 }
 
