@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::edge::EdgeId;
 use super::property::{Properties, Value};
 
 pub type NodeId = u64;
@@ -9,6 +10,10 @@ pub struct Node {
     pub id: NodeId,
     pub labels: Vec<String>,
     pub props: Properties,
+    /// Head of the outgoing edge chain (None if no outgoing edges yet).
+    pub out_head: Option<EdgeId>,
+    /// Head of the incoming edge chain (None if no incoming edges yet).
+    pub in_head: Option<EdgeId>,
 }
 
 impl Node {
@@ -17,6 +22,8 @@ impl Node {
             id,
             labels: Vec::new(),
             props: Properties::default(),
+            out_head: None,
+            in_head: None,
         }
     }
 
