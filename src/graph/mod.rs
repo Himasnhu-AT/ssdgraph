@@ -1,7 +1,9 @@
 pub mod edge;
+pub mod graph;
 pub mod node;
 pub mod property;
 
 pub use edge::{Edge, EdgeId};
+pub use graph::Graph;
 pub use node::{Node, NodeId};
-pub use property::Value;
+pub use property::{Properties, Value};
