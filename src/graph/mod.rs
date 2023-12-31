@@ -2,6 +2,7 @@ pub mod edge;
 pub mod graph;
 pub mod node;
 pub mod property;
+pub mod traversal;
 
 pub use edge::{Edge, EdgeId};
 pub use graph::Graph;
