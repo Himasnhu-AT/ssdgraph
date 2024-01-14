@@ -71,7 +71,7 @@ mod tests {
             let mut page = pager.alloc_page(PageKind::Edge).unwrap();
             let pid = page.id;
             let s = page.push_slot(&edge.encode()).unwrap();
-            pager.write_page(&page).unwrap();
+            pager.write_page(&mut page).unwrap();
             pager.sync().unwrap();
             (pid, s)
         };

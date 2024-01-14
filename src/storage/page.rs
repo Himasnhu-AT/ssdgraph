@@ -1,19 +1,26 @@
 //! 4 KiB fixed-size page. The page layout is:
 //!
 //! ```text
-//!   +--------------------+ 0
-//!   | header (16 bytes)  |
-//!   +--------------------+ 16
-//!   | data slabs grow -->|
-//!   |                    |
-//!   |   <-- slot dir     |
-//!   +--------------------+ 4096
+//!   +------------------------+ 0
+//!   | header (16 bytes)      |
+//!   +------------------------+ 16
+//!   | data slabs grow -->    |
+//!   |                        |
+//!   |   <-- slot directory   |
+//!   +------------------------+ PAGE_SIZE - 4
+//!   | CRC32 of bytes[0..end] |
+//!   +------------------------+ PAGE_SIZE
 //! ```
 //!
 //! Header: page_id u64 | kind u8 | reserved [3] | slot_count u16 | free_offset u16.
+//! The last 4 bytes hold a CRC32 of everything that precedes them. `seal` must
+//! be called before the page is written to disk; `decode` verifies the CRC on
+//! every read.
 
 pub const PAGE_SIZE: usize = 4096;
 pub const HEADER_SIZE: usize = 16;
+pub const CRC_SIZE: usize = 4;
+pub const SLOT_AREA_END: usize = PAGE_SIZE - CRC_SIZE;
 
 pub type PageId = u64;
 
@@ -89,12 +96,10 @@ impl Page {
         self.bytes[15] = b[1];
     }
 
-    /// Append a payload as a new slot. Returns the slot index, or `None` if the
-    /// page has no room.
     pub fn push_slot(&mut self, data: &[u8]) -> Option<u16> {
         let slot_count = self.slot_count() as usize;
         let free_off = self.free_offset() as usize;
-        let slot_dir_end = PAGE_SIZE - slot_count * 4;
+        let slot_dir_end = SLOT_AREA_END - slot_count * 4;
         if free_off + data.len() + 4 > slot_dir_end {
             return None;
         }
@@ -115,7 +120,7 @@ impl Page {
         if idx >= self.slot_count() {
             return None;
         }
-        let slot_pos = PAGE_SIZE - (idx as usize + 1) * 4;
+        let slot_pos = SLOT_AREA_END - (idx as usize + 1) * 4;
         let off = u16::from_le_bytes([self.bytes[slot_pos], self.bytes[slot_pos + 1]]) as usize;
         let len = u16::from_le_bytes([self.bytes[slot_pos + 2], self.bytes[slot_pos + 3]]) as usize;
         Some(&self.bytes[off..off + len])
@@ -125,7 +130,29 @@ impl Page {
         &self.bytes[..]
     }
 
+    /// Compute and write the page CRC. Idempotent. Must be called before any
+    /// `as_bytes()` consumer that will persist the result.
+    pub fn seal(&mut self) {
+        let crc = compute_crc(&self.bytes[..SLOT_AREA_END]);
+        self.bytes[SLOT_AREA_END..].copy_from_slice(&crc.to_le_bytes());
+    }
+
+    pub fn stored_checksum(&self) -> u32 {
+        u32::from_le_bytes(self.bytes[SLOT_AREA_END..].try_into().unwrap())
+    }
+
+    pub fn verify_checksum(&self) -> bool {
+        let stored = self.stored_checksum();
+        let computed = compute_crc(&self.bytes[..SLOT_AREA_END]);
+        stored == computed
+    }
+
     pub fn decode(bytes: [u8; PAGE_SIZE]) -> Option<Self> {
+        let stored = u32::from_le_bytes(bytes[SLOT_AREA_END..].try_into().ok()?);
+        let computed = compute_crc(&bytes[..SLOT_AREA_END]);
+        if stored != computed {
+            return None;
+        }
         let id = u64::from_le_bytes(bytes[0..8].try_into().ok()?);
         let kind = PageKind::from_u8(bytes[8])?;
         Some(Page {
@@ -134,6 +161,12 @@ impl Page {
             bytes: Box::new(bytes),
         })
     }
+}
+
+fn compute_crc(bytes: &[u8]) -> u32 {
+    let mut h = crc32fast::Hasher::new();
+    h.update(bytes);
+    h.finalize()
 }
 
 #[cfg(test)]
@@ -146,10 +179,10 @@ mod tests {
         let a = p.push_slot(b"alpha").unwrap();
         let b = p.push_slot(b"bravo!!").unwrap();
         let c = p.push_slot(b"charlie").unwrap();
+        p.seal();
 
-        let raw = p.as_bytes().to_vec();
         let mut arr = [0u8; PAGE_SIZE];
-        arr.copy_from_slice(&raw);
+        arr.copy_from_slice(p.as_bytes());
         let q = Page::decode(arr).unwrap();
 
         assert_eq!(q.id, 7);
@@ -166,5 +199,18 @@ mod tests {
         let mut p = Page::new(0, PageKind::Node);
         let big = vec![0xAB; PAGE_SIZE];
         assert!(p.push_slot(&big).is_none());
+    }
+
+    #[test]
+    fn corrupted_page_fails_decode() {
+        let mut p = Page::new(3, PageKind::Node);
+        p.push_slot(b"hello").unwrap();
+        p.seal();
+
+        let mut arr = [0u8; PAGE_SIZE];
+        arr.copy_from_slice(p.as_bytes());
+        // Flip a byte in the data area.
+        arr[100] ^= 0xff;
+        assert!(Page::decode(arr).is_none());
     }
 }

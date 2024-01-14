@@ -115,8 +115,8 @@ impl Pager {
             self.next_page_id += 1;
             id
         };
-        let page = Page::new(id, kind);
-        self.write_page(&page)?;
+        let mut page = Page::new(id, kind);
+        self.write_page(&mut page)?;
         self.write_header()?;
         Ok(page)
     }
@@ -141,13 +141,14 @@ impl Pager {
         Page::decode(buf).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "bad page"))
     }
 
-    pub fn write_page(&mut self, page: &Page) -> io::Result<()> {
+    pub fn write_page(&mut self, page: &mut Page) -> io::Result<()> {
         if page.id == HEADER_PAGE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "cannot write to header",
             ));
         }
+        page.seal();
         self.file.seek(SeekFrom::Start(page.id * PAGE_SIZE as u64))?;
         self.file.write_all(page.as_bytes())?;
         self.cache.invalidate(page.id);
@@ -159,7 +160,7 @@ impl Pager {
         free_page
             .push_slot(&self.free_head.to_le_bytes())
             .expect("free-list pointer always fits");
-        self.write_page(&free_page)?;
+        self.write_page(&mut free_page)?;
         self.free_head = id;
         self.write_header()?;
         Ok(())
@@ -194,7 +195,7 @@ mod tests {
             let mut page = pager.alloc_page(PageKind::Node).unwrap();
             id = page.id;
             page.push_slot(b"hello-world").unwrap();
-            pager.write_page(&page).unwrap();
+            pager.write_page(&mut page).unwrap();
             pager.sync().unwrap();
         }
 

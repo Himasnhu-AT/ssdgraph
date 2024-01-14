@@ -118,9 +118,11 @@ mod tests {
         let mut wal = Wal::open(&wal_path).unwrap();
         let mut a_page = Page::new(p1, PageKind::Node);
         a_page.push_slot(b"one").unwrap();
+        a_page.seal();
         wal.append_page(p1, a_page.as_bytes()).unwrap();
         let mut b_page = Page::new(p2, PageKind::Node);
         b_page.push_slot(b"two").unwrap();
+        b_page.seal();
         wal.append_page(p2, b_page.as_bytes()).unwrap();
         wal.sync().unwrap();
 
@@ -129,8 +131,8 @@ mod tests {
         let mut wal = Wal::open(&wal_path).unwrap();
         let n = wal
             .replay(|_id, bytes| {
-                let page = Page::decode(bytes).expect("valid page in WAL");
-                pager.write_page(&page)
+                let mut page = Page::decode(bytes).expect("valid page in WAL");
+                pager.write_page(&mut page)
             })
             .unwrap();
         assert_eq!(n, 2);
@@ -148,6 +150,7 @@ mod tests {
         let mut wal = Wal::open(&wal_path).unwrap();
         let mut p = Page::new(7, PageKind::Node);
         p.push_slot(b"good").unwrap();
+        p.seal();
         wal.append_page(7, p.as_bytes()).unwrap();
         wal.sync().unwrap();
 

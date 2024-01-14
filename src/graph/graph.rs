@@ -68,9 +68,9 @@ impl Graph {
         // Replay any pending WAL records into the data file before we trust
         // the on-disk pages.
         wal.replay(|_id, bytes| {
-            let p = Page::decode(bytes)
+            let mut p = Page::decode(bytes)
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "bad WAL page"))?;
-            pager.write_page(&p)
+            pager.write_page(&mut p)
         })?;
         pager.sync()?;
         wal.checkpoint()?;
@@ -282,7 +282,7 @@ impl Graph {
             let mut owned = (*page).clone();
             drop(page);
             if let Some(slot) = owned.push_slot(bytes) {
-                self.write_page_durable(&owned)?;
+                self.write_page_durable(&mut owned)?;
                 return Ok((pid, slot));
             }
         }
@@ -290,7 +290,7 @@ impl Graph {
         let slot = new_page
             .push_slot(bytes)
             .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "record too large for page"))?;
-        self.write_page_durable(&new_page)?;
+        self.write_page_durable(&mut new_page)?;
         let pid = new_page.id;
         match kind {
             PageKind::Node => self.meta.write_node_page = Some(pid),
@@ -300,7 +300,8 @@ impl Graph {
         Ok((pid, slot))
     }
 
-    fn write_page_durable(&mut self, page: &Page) -> io::Result<()> {
+    fn write_page_durable(&mut self, page: &mut Page) -> io::Result<()> {
+        page.seal();
         self.wal.append_page(page.id, page.as_bytes())?;
         self.pager.write_page(page)
     }
