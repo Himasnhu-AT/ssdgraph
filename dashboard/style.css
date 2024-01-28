@@ -1,0 +1,19 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: ui-sans-serif, system-ui, sans-serif; }
+body { display: flex; flex-direction: column; background: #0f1115; color: #e6e8eb; }
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #2a2f3a;
+  background: #14171f;
+}
+.topbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.02em; }
+.stats { color: #9aa3b2; font-size: 0.85rem; }
+
+.canvas {
+  flex: 1 1 auto;
+  background: #0f1115;
+}

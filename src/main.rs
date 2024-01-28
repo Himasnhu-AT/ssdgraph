@@ -20,6 +20,8 @@ enum Cmd {
         data: PathBuf,
         #[arg(long, default_value = "127.0.0.1:7878")]
         addr: SocketAddr,
+        #[arg(long, default_value = "./dashboard")]
+        dashboard: PathBuf,
     },
 }
 
@@ -34,10 +36,14 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Serve { data, addr } => {
+        Cmd::Serve {
+            data,
+            addr,
+            dashboard,
+        } => {
             let graph = Graph::open(&data)?;
-            tracing::info!(?data, "graph opened");
-            server::serve(graph, addr).await?;
+            tracing::info!(?data, ?dashboard, "graph opened");
+            server::serve(graph, addr, &dashboard).await?;
         }
     }
     Ok(())
