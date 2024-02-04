@@ -9,9 +9,19 @@
 <body>
   <header class="topbar">
     <h1>ssdgraph</h1>
+    <input id="search" class="search" type="search" placeholder="search labels, keys, string values…" autocomplete="off" />
+    <select id="label-filter" class="filter">
+      <option value="">all labels</option>
+    </select>
+    <button id="reload" class="btn" title="re-fetch /api/graph">↻</button>
     <span id="stats" class="stats">loading…</span>
   </header>
-  <main id="cy" class="canvas"></main>
+  <main class="layout">
+    <section id="cy" class="canvas"></section>
+    <aside id="details" class="details">
+      <p class="hint">click a node or edge to inspect it</p>
+    </aside>
+  </main>
   <script src="/dashboard/vendor/cytoscape.min.js"></script>
   <script src="/dashboard/app.js"></script>
 </body>
