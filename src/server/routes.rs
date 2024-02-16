@@ -82,7 +82,9 @@ fn err500<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
 }
 
-async fn list_nodes(State(state): State<AppState>) -> Result<Json<Vec<NodeJson>>, (StatusCode, String)> {
+async fn list_nodes(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<NodeJson>>, (StatusCode, String)> {
     let mut g = state.graph.write().await;
     let ids = g.all_node_ids();
     let mut out = Vec::with_capacity(ids.len());
@@ -98,7 +100,9 @@ async fn list_nodes(State(state): State<AppState>) -> Result<Json<Vec<NodeJson>>
     Ok(Json(out))
 }
 
-async fn list_edges(State(state): State<AppState>) -> Result<Json<Vec<EdgeJson>>, (StatusCode, String)> {
+async fn list_edges(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<EdgeJson>>, (StatusCode, String)> {
     let mut g = state.graph.write().await;
     let ids = g.all_edge_ids();
     let mut out = Vec::with_capacity(ids.len());
@@ -166,7 +170,9 @@ async fn search(
     let limit = q.limit.unwrap_or(usize::MAX);
     let mut out = Vec::new();
     for id in candidates {
-        let Some(n) = g.get_node(id).map_err(err500)? else { continue; };
+        let Some(n) = g.get_node(id).map_err(err500)? else {
+            continue;
+        };
         let matches = if needle.is_empty() {
             true
         } else {

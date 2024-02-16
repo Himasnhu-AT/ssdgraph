@@ -13,7 +13,10 @@ use ssdgraph::storage::pager::Pager;
 use ssdgraph::storage::wal::Wal;
 
 fn p(pairs: &[(&str, Value)]) -> Properties {
-    pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), v.clone()))
+        .collect()
 }
 
 #[test]

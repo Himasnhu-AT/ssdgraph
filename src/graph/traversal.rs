@@ -115,7 +115,12 @@ mod tests {
     #[test]
     fn neighbors_lists_outgoing_destinations() {
         let (_dir, mut g, [a, b, c, _d]) = small_graph();
-        let mut got: Vec<NodeId> = g.neighbors(a).unwrap().into_iter().map(|(_, d)| d).collect();
+        let mut got: Vec<NodeId> = g
+            .neighbors(a)
+            .unwrap()
+            .into_iter()
+            .map(|(_, d)| d)
+            .collect();
         got.sort();
         let mut want = [b, c];
         want.sort();

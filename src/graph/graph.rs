@@ -99,11 +99,7 @@ impl Graph {
 
     // ----- nodes ----------------------------------------------------------
 
-    pub fn create_node(
-        &mut self,
-        labels: Vec<String>,
-        props: Properties,
-    ) -> io::Result<NodeId> {
+    pub fn create_node(&mut self, labels: Vec<String>, props: Properties) -> io::Result<NodeId> {
         let id = self.meta.next_node_id;
         self.meta.next_node_id += 1;
 
@@ -197,22 +193,26 @@ impl Graph {
         type_name: impl Into<String>,
         props: Properties,
     ) -> io::Result<EdgeId> {
-        let mut src_node = self.get_node(src)?.ok_or_else(|| {
-            io::Error::new(io::ErrorKind::NotFound, format!("no node {src}"))
-        })?;
-        let mut dst_node = if src == dst {
-            None
-        } else {
-            Some(self.get_node(dst)?.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::NotFound, format!("no node {dst}"))
-            })?)
-        };
+        let mut src_node = self
+            .get_node(src)?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no node {src}")))?;
+        let mut dst_node =
+            if src == dst {
+                None
+            } else {
+                Some(self.get_node(dst)?.ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::NotFound, format!("no node {dst}"))
+                })?)
+            };
 
         let id = self.meta.next_edge_id;
         self.meta.next_edge_id += 1;
 
         let prev_out = src_node.out_head;
-        let prev_in = dst_node.as_ref().map(|n| n.in_head).unwrap_or(src_node.in_head);
+        let prev_in = dst_node
+            .as_ref()
+            .map(|n| n.in_head)
+            .unwrap_or(src_node.in_head);
 
         let edge = Edge {
             id,
@@ -289,7 +289,7 @@ impl Graph {
         let mut new_page = self.pager.alloc_page(kind)?;
         let slot = new_page
             .push_slot(bytes)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "record too large for page"))?;
+            .ok_or_else(|| io::Error::other("record too large for page"))?;
         self.write_page_durable(&mut new_page)?;
         let pid = new_page.id;
         match kind {
@@ -320,8 +320,8 @@ fn load_meta(dir: &Path) -> io::Result<GraphMeta> {
 fn write_meta(dir: &Path, meta: &GraphMeta) -> io::Result<()> {
     let tmp = dir.join(format!("{META_FILE}.tmp"));
     let final_path = dir.join(META_FILE);
-    let bytes = bincode::serialize(meta)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("meta encode: {e}")))?;
+    let bytes =
+        bincode::serialize(meta).map_err(|e| io::Error::other(format!("meta encode: {e}")))?;
     std::fs::write(&tmp, &bytes)?;
     std::fs::rename(&tmp, &final_path)?;
     Ok(())
@@ -395,7 +395,10 @@ mod tests {
         let mut g = Graph::open(dir.path()).unwrap();
 
         let id = g
-            .create_node(vec!["Draft".into()], props(&[("title", Value::Str("x".into()))]))
+            .create_node(
+                vec!["Draft".into()],
+                props(&[("title", Value::Str("x".into()))]),
+            )
             .unwrap();
         let mut node = g.get_node(id).unwrap().unwrap();
         node.labels = vec!["Published".into()];

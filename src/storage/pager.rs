@@ -38,6 +38,7 @@ impl Pager {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path)?;
         if exists {
             Self::load_header(file, cache_pages)
@@ -123,7 +124,10 @@ impl Pager {
 
     pub fn read_page(&mut self, id: PageId) -> io::Result<Arc<Page>> {
         if id == HEADER_PAGE {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "page 0 is header"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "page 0 is header",
+            ));
         }
         if let Some(p) = self.cache.get(id) {
             return Ok(p);
@@ -149,7 +153,8 @@ impl Pager {
             ));
         }
         page.seal();
-        self.file.seek(SeekFrom::Start(page.id * PAGE_SIZE as u64))?;
+        self.file
+            .seek(SeekFrom::Start(page.id * PAGE_SIZE as u64))?;
         self.file.write_all(page.as_bytes())?;
         self.cache.invalidate(page.id);
         Ok(())

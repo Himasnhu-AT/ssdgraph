@@ -51,10 +51,7 @@ impl Graph {
             let Some(node) = self.get_node(id)? else {
                 continue;
             };
-            if q.filters
-                .iter()
-                .all(|(k, v)| node.props.get(k) == Some(v))
-            {
+            if q.filters.iter().all(|(k, v)| node.props.get(k) == Some(v)) {
                 out.push(node);
                 if let Some(lim) = q.limit {
                     if out.len() >= lim {
@@ -84,18 +81,34 @@ mod tests {
     fn match_label_then_filter() {
         let dir = tempdir().unwrap();
         let mut g = Graph::open(dir.path()).unwrap();
-        g.create_node(vec!["Person".into()], props(&[("city", Value::Str("Paris".into()))])).unwrap();
-        g.create_node(vec!["Person".into()], props(&[("city", Value::Str("Berlin".into()))])).unwrap();
-        g.create_node(vec!["Person".into()], props(&[("city", Value::Str("Paris".into()))])).unwrap();
-        g.create_node(vec!["Robot".into()], props(&[("city", Value::Str("Paris".into()))])).unwrap();
+        g.create_node(
+            vec!["Person".into()],
+            props(&[("city", Value::Str("Paris".into()))]),
+        )
+        .unwrap();
+        g.create_node(
+            vec!["Person".into()],
+            props(&[("city", Value::Str("Berlin".into()))]),
+        )
+        .unwrap();
+        g.create_node(
+            vec!["Person".into()],
+            props(&[("city", Value::Str("Paris".into()))]),
+        )
+        .unwrap();
+        g.create_node(
+            vec!["Robot".into()],
+            props(&[("city", Value::Str("Paris".into()))]),
+        )
+        .unwrap();
 
         let parisians = g
-            .run_query(
-                &Query::match_label("Person").where_prop("city", Value::Str("Paris".into())),
-            )
+            .run_query(&Query::match_label("Person").where_prop("city", Value::Str("Paris".into())))
             .unwrap();
         assert_eq!(parisians.len(), 2);
-        assert!(parisians.iter().all(|n| n.labels.contains(&"Person".to_string())));
+        assert!(parisians
+            .iter()
+            .all(|n| n.labels.contains(&"Person".to_string())));
     }
 
     #[test]
@@ -113,10 +126,15 @@ mod tests {
     fn no_label_scans_everything() {
         let dir = tempdir().unwrap();
         let mut g = Graph::open(dir.path()).unwrap();
-        g.create_node(vec!["A".into()], props(&[("k", Value::Int(1))])).unwrap();
-        g.create_node(vec!["B".into()], props(&[("k", Value::Int(1))])).unwrap();
-        g.create_node(vec!["B".into()], props(&[("k", Value::Int(2))])).unwrap();
-        let res = g.run_query(&Query::new().where_prop("k", Value::Int(1))).unwrap();
+        g.create_node(vec!["A".into()], props(&[("k", Value::Int(1))]))
+            .unwrap();
+        g.create_node(vec!["B".into()], props(&[("k", Value::Int(1))]))
+            .unwrap();
+        g.create_node(vec!["B".into()], props(&[("k", Value::Int(2))]))
+            .unwrap();
+        let res = g
+            .run_query(&Query::new().where_prop("k", Value::Int(1)))
+            .unwrap();
         assert_eq!(res.len(), 2);
     }
 }

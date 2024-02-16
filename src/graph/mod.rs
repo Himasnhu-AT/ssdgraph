@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 pub mod edge;
 pub mod graph;
 pub mod node;
